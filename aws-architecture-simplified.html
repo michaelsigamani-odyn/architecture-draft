@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odyn Network — Platform Overview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #f1f5f9;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .slide {
+    width: 1280px;
+    height: 720px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="slide">
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+  </marker>
+  <marker id="arr-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+  </marker>
+  <marker id="arr-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#22c55e"/>
+  </marker>
+  <marker id="arr-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6"/>
+  </marker>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+    <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#00000015"/>
+  </filter>
+</defs>
+
+<!-- ── Background ── -->
+<rect width="1280" height="720" fill="#f8fafc"/>
+
+<!-- ── Header ── -->
+<rect x="0" y="0" width="1280" height="70" fill="#0f172a"/>
+<text x="40" y="28" fill="#94a3b8" font-size="11" font-weight="500" letter-spacing="2">PLATFORM OVERVIEW</text>
+<text x="40" y="52" fill="#f1f5f9" font-size="22" font-weight="700">Odyn Network — How It Works</text>
+<text x="1240" y="40" text-anchor="end" fill="#475569" font-size="12">AI Compute Marketplace</text>
+
+<!-- ── Column backgrounds ── -->
+<!-- Col 1: Who -->
+<rect x="20" y="88" width="280" height="544" rx="12" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+<text x="160" y="116" text-anchor="middle" fill="#1d4ed8" font-size="11" font-weight="700" letter-spacing="1.5">WHO USES ODYN</text>
+
+<!-- Col 2: Platform -->
+<rect x="320" y="88" width="600" height="544" rx="12" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="620" y="116" text-anchor="middle" fill="#15803d" font-size="11" font-weight="700" letter-spacing="1.5">THE ODYN PLATFORM</text>
+
+<!-- Col 3: Compute -->
+<rect x="940" y="88" width="320" height="544" rx="12" fill="#fdf4ff" stroke="#e9d5ff" stroke-width="1.5"/>
+<text x="1100" y="116" text-anchor="middle" fill="#7e22ce" font-size="11" font-weight="700" letter-spacing="1.5">GPU COMPUTE</text>
+
+<!-- ════════════════════════
+     COLUMN 1 — USERS
+════════════════════════ -->
+
+<!-- Buyer box -->
+<rect x="36" y="132" width="248" height="148" rx="12" fill="#ffffff" stroke="#93c5fd" stroke-width="2" filter="url(#shadow)"/>
+<text x="160" y="166" text-anchor="middle" font-size="28">👤</text>
+<text x="160" y="192" text-anchor="middle" fill="#1e40af" font-size="16" font-weight="700">Buyer</text>
+<text x="160" y="213" text-anchor="middle" fill="#475569" font-size="12">Accesses AI models and rents</text>
+<text x="160" y="230" text-anchor="middle" fill="#475569" font-size="12">GPU compute via the</text>
+<text x="160" y="247" text-anchor="middle" fill="#475569" font-size="12">marketplace</text>
+<rect x="52" y="258" width="216" height="18" rx="9" fill="#dbeafe"/>
+<text x="160" y="271" text-anchor="middle" fill="#1d4ed8" font-size="10" font-weight="600">API · Jupyter · Terminal access</text>
+
+<!-- Supplier box -->
+<rect x="36" y="302" width="248" height="148" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="160" y="336" text-anchor="middle" font-size="28">🖥️</text>
+<text x="160" y="362" text-anchor="middle" fill="#15803d" font-size="16" font-weight="700">Supplier</text>
+<text x="160" y="383" text-anchor="middle" fill="#475569" font-size="12">Earns revenue by connecting</text>
+<text x="160" y="400" text-anchor="middle" fill="#475569" font-size="12">GPU hardware to the Odyn</text>
+<text x="160" y="417" text-anchor="middle" fill="#475569" font-size="12">network</text>
+<rect x="52" y="428" width="216" height="18" rx="9" fill="#dcfce7"/>
+<text x="160" y="441" text-anchor="middle" fill="#15803d" font-size="10" font-weight="600">Paid per second of GPU usage</text>
+
+<!-- Supplier onboarding note -->
+<rect x="36" y="470" width="248" height="88" rx="10" fill="#fefce8" stroke="#fde68a" stroke-width="1.5"/>
+<text x="160" y="493" text-anchor="middle" font-size="18">📦</text>
+<text x="160" y="514" text-anchor="middle" fill="#92400e" font-size="11" font-weight="700">One-Command Onboarding</text>
+<text x="160" y="531" text-anchor="middle" fill="#78350f" font-size="10">Single install script connects</text>
+<text x="160" y="547" text-anchor="middle" fill="#78350f" font-size="10">GPU hardware automatically</text>
+
+<!-- ════════════════════════
+     COLUMN 2 — PLATFORM
+════════════════════════ -->
+
+<!-- Web App box -->
+<rect x="336" y="132" width="264" height="110" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="468" y="162" text-anchor="middle" font-size="24">🌐</text>
+<text x="468" y="187" text-anchor="middle" fill="#15803d" font-size="15" font-weight="700">Marketplace Web App</text>
+<text x="468" y="207" text-anchor="middle" fill="#475569" font-size="12">Supplier dashboard · Buyer portal</text>
+<text x="468" y="224" text-anchor="middle" fill="#475569" font-size="12">Served globally via CDN</text>
+
+<!-- Control Plane box -->
+<rect x="336" y="262" width="264" height="144" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="468" y="292" text-anchor="middle" font-size="24">🖥️</text>
+<text x="468" y="316" text-anchor="middle" fill="#15803d" font-size="15" font-weight="700">Control Plane</text>
+<text x="468" y="338" text-anchor="middle" fill="#475569" font-size="12">The platform's brain — user accounts,</text>
+<text x="468" y="356" text-anchor="middle" fill="#475569" font-size="12">billing, GPU cluster management</text>
+<text x="468" y="374" text-anchor="middle" fill="#475569" font-size="12">and access control</text>
+<!-- DB badge -->
+<rect x="354" y="386" width="228" height="18" rx="9" fill="#dcfce7"/>
+<text x="468" y="399" text-anchor="middle" fill="#15803d" font-size="10" font-weight="600">Go API · PostgreSQL · Session routing</text>
+
+<!-- Ray AI Orchestration box -->
+<rect x="336" y="426" width="264" height="132" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="468" y="453" text-anchor="middle" font-size="20">🚀</text>
+<text x="468" y="474" text-anchor="middle" fill="#15803d" font-size="15" font-weight="700">Ray — AI Orchestration</text>
+<text x="468" y="495" text-anchor="middle" fill="#475569" font-size="12">Distributes and scales AI models</text>
+<text x="468" y="513" text-anchor="middle" fill="#475569" font-size="12">across all GPU nodes automatically</text>
+<text x="468" y="531" text-anchor="middle" fill="#475569" font-size="12">Routes buyer requests to models</text>
+<rect x="354" y="542" width="228" height="14" rx="7" fill="#dcfce7"/>
+<text x="468" y="553" text-anchor="middle" fill="#15803d" font-size="10" font-weight="600">Ray Serve · vLLM · Auto-scaling</text>
+
+<!-- Security / Network box -->
+<rect x="618" y="132" width="284" height="110" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="760" y="162" text-anchor="middle" font-size="24">🔒</text>
+<text x="760" y="187" text-anchor="middle" fill="#15803d" font-size="15" font-weight="700">Secure Private Network</text>
+<text x="760" y="207" text-anchor="middle" fill="#475569" font-size="12">All GPU nodes connected via</text>
+<text x="760" y="224" text-anchor="middle" fill="#475569" font-size="12">encrypted VPN — no public exposure</text>
+
+<!-- Node Agent box -->
+<rect x="618" y="262" width="284" height="144" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="760" y="292" text-anchor="middle" font-size="24">🔧</text>
+<text x="760" y="316" text-anchor="middle" fill="#15803d" font-size="15" font-weight="700">Node Agent</text>
+<text x="760" y="338" text-anchor="middle" fill="#475569" font-size="12">Lightweight software installed</text>
+<text x="760" y="356" text-anchor="middle" fill="#475569" font-size="12">on each GPU machine</text>
+<text x="760" y="374" text-anchor="middle" fill="#475569" font-size="12">Manages containers · Reports health</text>
+<rect x="636" y="386" width="248" height="18" rx="9" fill="#dcfce7"/>
+<text x="760" y="399" text-anchor="middle" fill="#15803d" font-size="10" font-weight="600">Self-updating · Auto-registers with platform</text>
+
+<!-- Monitoring box -->
+<rect x="618" y="426" width="284" height="132" rx="12" fill="#ffffff" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+<text x="760" y="456" text-anchor="middle" font-size="24">📊</text>
+<text x="760" y="480" text-anchor="middle" fill="#15803d" font-size="15" font-weight="700">Observability</text>
+<text x="760" y="502" text-anchor="middle" fill="#475569" font-size="12">Monitors AI model performance</text>
+<text x="760" y="520" text-anchor="middle" fill="#475569" font-size="12">GPU utilisation · Request latency</text>
+<text x="760" y="538" text-anchor="middle" fill="#475569" font-size="12">Scoped to the AI layer only</text>
+
+<!-- ════════════════════════
+     COLUMN 3 — COMPUTE
+════════════════════════ -->
+
+<!-- AI Models box -->
+<rect x="956" y="132" width="288" height="130" rx="12" fill="#ffffff" stroke="#d8b4fe" stroke-width="2" filter="url(#shadow)"/>
+<text x="1100" y="164" text-anchor="middle" font-size="28">🧠</text>
+<text x="1100" y="190" text-anchor="middle" fill="#7e22ce" font-size="16" font-weight="700">AI Models</text>
+<text x="1100" y="212" text-anchor="middle" fill="#475569" font-size="12">Large language models running</text>
+<text x="1100" y="230" text-anchor="middle" fill="#475569" font-size="12">on GPU hardware</text>
+<rect x="972" y="244" width="256" height="16" rx="8" fill="#f3e8ff"/>
+<text x="1100" y="256" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Qwen2.5 32B</text>
+
+<!-- GPU Nodes box -->
+<rect x="956" y="282" width="288" height="130" rx="12" fill="#ffffff" stroke="#d8b4fe" stroke-width="2" filter="url(#shadow)"/>
+<text x="1100" y="314" text-anchor="middle" font-size="28">⚡</text>
+<text x="1100" y="340" text-anchor="middle" fill="#7e22ce" font-size="16" font-weight="700">GPU Nodes</text>
+<text x="1100" y="362" text-anchor="middle" fill="#475569" font-size="12">A100s · H100s · RTX clusters</text>
+<text x="1100" y="380" text-anchor="middle" fill="#475569" font-size="12">Cloud and on-premise hardware</text>
+<rect x="972" y="394" width="256" height="16" rx="8" fill="#f3e8ff"/>
+<text x="1100" y="406" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Supplier-owned · Auto-enrolled on install</text>
+
+<!-- Cloud Providers box -->
+<rect x="956" y="432" width="288" height="170" rx="12" fill="#ffffff" stroke="#d8b4fe" stroke-width="2" filter="url(#shadow)"/>
+<text x="1100" y="462" text-anchor="middle" font-size="24">☁️</text>
+<text x="1100" y="486" text-anchor="middle" fill="#7e22ce" font-size="15" font-weight="700">Cloud GPU Providers</text>
+<text x="1100" y="508" text-anchor="middle" fill="#475569" font-size="12">Capacity sourced from multiple</text>
+<text x="1100" y="526" text-anchor="middle" fill="#475569" font-size="12">cloud providers and bare metal</text>
+<!-- Provider pills -->
+<rect x="966" y="540" width="74" height="22" rx="11" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1"/>
+<text x="1003" y="555" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Lambda</text>
+<rect x="1048" y="540" width="66" height="22" rx="11" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1"/>
+<text x="1081" y="555" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Runpod</text>
+<rect x="1122" y="540" width="74" height="22" rx="11" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1"/>
+<text x="1159" y="555" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Scaleway</text>
+<rect x="966" y="568" width="66" height="22" rx="11" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1"/>
+<text x="999" y="583" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Hetzner</text>
+<rect x="1040" y="568" width="70" height="22" rx="11" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1"/>
+<text x="1075" y="583" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">Nebius</text>
+<rect x="1118" y="568" width="78" height="22" rx="11" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="1"/>
+<text x="1157" y="583" text-anchor="middle" fill="#7e22ce" font-size="10" font-weight="600">+ more</text>
+
+<!-- ════════════════════════
+     ARROWS
+════════════════════════ -->
+
+<!-- Buyer → Web App -->
+<path d="M 284 196 Q 310 196 336 186" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#arr-blue)" stroke-dasharray="6,3"/>
+<text x="310" y="188" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="600">Browse</text>
+
+<!-- Buyer → Platform API (API calls) -->
+<path d="M 284 220 Q 310 240 336 300" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#arr-blue)" stroke-dasharray="6,3"/>
+<text x="296" y="258" fill="#3b82f6" font-size="10" font-weight="600">API calls</text>
+
+<!-- Supplier → Node Agent (routed through inter-row gap to avoid overlap) -->
+<path d="M 284 420 C 320 416 580 416 618 395" stroke="#22c55e" stroke-width="2" fill="none" marker-end="url(#arr-green)" stroke-dasharray="6,3"/>
+<rect x="348" y="406" width="204" height="18" rx="9" fill="#f0fdf4" stroke="#86efac" stroke-width="1" opacity="0.95"/>
+<text x="450" y="419" text-anchor="middle" fill="#15803d" font-size="10" font-weight="600">Installs agent · Joins network</text>
+
+<!-- Web App ↔ Platform API -->
+<line x1="468" y1="242" x2="468" y2="262" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- Platform API → AI Orchestration -->
+<line x1="468" y1="406" x2="468" y2="426" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- Web App → Security -->
+<line x1="600" y1="187" x2="618" y2="187" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- Platform API → Node Agent -->
+<line x1="600" y1="334" x2="618" y2="334" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- AI Orchestration → Monitoring -->
+<line x1="600" y1="492" x2="618" y2="492" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- Platform → Compute (AI Models) -->
+<path d="M 902 187 Q 928 187 956 197" stroke="#8b5cf6" stroke-width="2" fill="none" marker-end="url(#arr-purple)"/>
+<text x="928" y="180" text-anchor="middle" fill="#8b5cf6" font-size="10" font-weight="600">Serves</text>
+
+<!-- AI Orchestration → GPU Nodes -->
+<path d="M 902 492 Q 928 492 956 380" stroke="#8b5cf6" stroke-width="2" fill="none" marker-end="url(#arr-purple)"/>
+<text x="934" y="442" fill="#8b5cf6" font-size="10" font-weight="600">Deploys</text>
+
+<!-- Node Agent → GPU Nodes -->
+<path d="M 902 334 Q 928 334 956 330" stroke="#8b5cf6" stroke-width="2" fill="none" marker-end="url(#arr-purple)"/>
+
+<!-- ── Footer ── -->
+<rect x="0" y="648" width="1280" height="72" fill="#0f172a"/>
+<!-- Two key value props -->
+<rect x="20" y="660" width="390" height="48" rx="10" fill="#1e293b"/>
+<text x="40" y="679" fill="#64748b" font-size="10" font-weight="600" letter-spacing="1">FOR BUYERS</text>
+<text x="40" y="698" fill="#e2e8f0" font-size="12">On-demand access to LLMs — pay only for what you use</text>
+
+<rect x="430" y="660" width="390" height="48" rx="10" fill="#1e293b"/>
+<text x="450" y="679" fill="#64748b" font-size="10" font-weight="600" letter-spacing="1">FOR SUPPLIERS</text>
+<text x="450" y="698" fill="#e2e8f0" font-size="12">Idle GPU hardware generates revenue automatically</text>
+
+<rect x="840" y="660" width="420" height="48" rx="10" fill="#1e293b"/>
+<text x="860" y="679" fill="#64748b" font-size="10" font-weight="600" letter-spacing="1">BUILT ON</text>
+<text x="860" y="698" fill="#e2e8f0" font-size="12">AWS · Ray · vLLM · Tailscale VPN · Go backend</text>
+
+</svg>
+</div>
+</body>
+</html>

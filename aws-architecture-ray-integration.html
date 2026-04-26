@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odyn Network — AWS Architecture (Ray Integration Branch)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d1117;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #e6edf3;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+header {
+  padding: 10px 20px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 20;
+}
+header h1 { font-size: 14px; font-weight: 600; color: #f0f6fc; white-space: nowrap; }
+header .branch { font-size: 11px; color: #8b949e; white-space: nowrap; }
+.badge {
+  background: #21262d; border: 1px solid #30363d;
+  border-radius: 6px; padding: 2px 8px; font-size: 11px; color: #58a6ff;
+  white-space: nowrap;
+}
+.badge.green { color: #3fb950; border-color: #238636; }
+.search-wrap {
+  margin-left: auto; position: relative; display: flex; align-items: center; gap: 8px;
+}
+#search-input {
+  background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+  color: #e6edf3; font-size: 12px; padding: 5px 10px 5px 28px;
+  width: 190px; outline: none; transition: border-color 0.2s, width 0.2s;
+}
+#search-input:focus { border-color: #58a6ff; width: 240px; }
+.search-icon { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: #8b949e; font-size: 11px; pointer-events: none; }
+#search-count { font-size: 11px; color: #8b949e; white-space: nowrap; min-width: 48px; }
+.kbd { display: inline-block; background: #21262d; border: 1px solid #30363d; border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 10px; color: #8b949e; }
+
+/* ── Legend ── */
+.legend {
+  display: flex; gap: 18px; padding: 6px 20px; flex-wrap: wrap;
+  background: #0d1117; border-bottom: 1px solid #21262d; flex-shrink: 0;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b949e; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── Layout ── */
+.main-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+/* ── Canvas ── */
+#canvas-wrap {
+  flex: 1; overflow: hidden; position: relative; cursor: grab;
+  background: #0d1117;
+}
+#canvas-wrap.grabbing { cursor: grabbing; }
+#diagram { display: block; transform-origin: 0 0; user-select: none; }
+svg text { font-family: 'Segoe UI', system-ui, sans-serif; }
+
+/* ── Node interactivity ── */
+.node { cursor: pointer; }
+.node rect, .node path { transition: opacity 0.18s, filter 0.18s; }
+
+.svg-dim .node:not(.sel):not(.adj) { opacity: 0.1; }
+.svg-dim .conn:not(.conn-lit) { opacity: 0.05 !important; }
+
+.node.sel > rect:first-of-type { filter: drop-shadow(0 0 10px #58a6ff99); }
+.node:hover:not(.sel) > rect:first-of-type { filter: drop-shadow(0 0 5px rgba(88,166,255,0.35)); }
+
+.svg-search .node:not(.smatch) { opacity: 0.1; }
+.node.smatch > rect:first-of-type { filter: drop-shadow(0 0 8px #e3b34188) !important; }
+
+.conn { transition: opacity 0.18s; }
+.conn-lit { stroke-width: 2.5 !important; opacity: 1 !important; }
+
+/* ── Detail panel ── */
+#panel {
+  width: 310px; flex-shrink: 0; background: #161b22;
+  border-left: 1px solid #30363d; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.22s ease;
+  overflow: hidden; z-index: 10;
+}
+#panel.open { transform: translateX(0); }
+#panel-head {
+  padding: 14px 14px 10px; border-bottom: 1px solid #30363d;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+#panel-icon { font-size: 22px; line-height: 1; flex-shrink: 0; padding-top: 2px; }
+#panel-title { font-size: 13px; font-weight: 600; color: #f0f6fc; line-height: 1.3; flex: 1; }
+#panel-sub { font-size: 11px; color: #58a6ff; margin-top: 3px; }
+#panel-close {
+  background: none; border: none; color: #8b949e; cursor: pointer;
+  font-size: 16px; padding: 0; line-height: 1; flex-shrink: 0;
+}
+#panel-close:hover { color: #f0f6fc; }
+#panel-body { flex: 1; overflow-y: auto; }
+#panel-body::-webkit-scrollbar { width: 4px; }
+#panel-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+.p-sec { padding: 10px 14px; border-bottom: 1px solid #21262d; }
+.p-sec:last-child { border-bottom: none; }
+.p-sec-title { font-size: 10px; font-weight: 700; letter-spacing: 0.7px; color: #8b949e; text-transform: uppercase; margin-bottom: 7px; }
+.p-line { font-size: 12px; color: #c9d1d9; padding: 2px 0; line-height: 1.55; }
+.p-line code { background: #21262d; border-radius: 3px; padding: 1px 5px; font-size: 11px; color: #3fb950; font-family: monospace; }
+.p-port { display: inline-block; background: #1a3a6a; border: 1px solid #30363d; border-radius: 4px; padding: 1px 6px; font-size: 11px; color: #58a6ff; font-family: monospace; margin: 2px 2px 2px 0; }
+.conn-item {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  border-radius: 5px; cursor: pointer; transition: background 0.12s; font-size: 12px;
+}
+.conn-item:hover { background: #21262d; }
+.conn-dir { font-size: 10px; color: #484f58; width: 18px; text-align: center; flex-shrink: 0; }
+.conn-name { flex: 1; color: #c9d1d9; font-weight: 500; }
+.conn-lbl { font-size: 10px; color: #8b949e; }
+
+/* ── Zoom buttons ── */
+#zoom-btns {
+  position: absolute; bottom: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 3px; z-index: 20;
+}
+#panel.open + #zoom-btns { right: 326px; }
+.zb {
+  width: 30px; height: 30px; background: #21262d; border: 1px solid #30363d;
+  border-radius: 6px; color: #8b949e; cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, color 0.12s; user-select: none; line-height: 1;
+}
+.zb:hover { background: #30363d; color: #f0f6fc; }
+
+/* ── Hint overlay ── */
+#hint {
+  position: absolute; bottom: 16px; left: 16px;
+  background: #161b22cc; border: 1px solid #30363d; border-radius: 7px;
+  padding: 8px 12px; font-size: 11px; color: #8b949e; pointer-events: none; z-index: 20;
+  line-height: 1.8; backdrop-filter: blur(4px);
+}
+
+/* ── Status bar ── */
+#statusbar {
+  padding: 5px 20px; background: #0d1117; border-top: 1px solid #21262d;
+  font-size: 11px; color: #484f58; display: flex; gap: 20px; flex-shrink: 0;
+}
+#status-sel { color: #8b949e; transition: color 0.2s; }
+
+/* ── Tooltip ── */
+#tooltip {
+  position: fixed; background: #21262d; border: 1px solid #30363d;
+  border-radius: 8px; padding: 9px 13px; font-size: 12px; color: #e6edf3;
+  pointer-events: none; opacity: 0; transition: opacity 0.13s;
+  z-index: 200; max-width: 290px; line-height: 1.5;
+}
+#tooltip.vis { opacity: 1; }
+
+    .wdo-chip rect {
+      fill: #111a2a;
+      stroke: #58a6ff;
+      stroke-width: 0.9;
+      rx: 6;
+      transition: stroke 0.25s ease, filter 0.25s ease;
+    }
+    .wdo-chip text {
+      fill: #8b949e;
+      font-size: 9px;
+      text-anchor: middle;
+    }
+    .wdo-chip.active rect {
+      stroke: #3fb950;
+      filter: drop-shadow(0 0 6px rgba(63,185,80,0.35));
+    }
+    .wdo-chip.active text {
+      fill: #c9d1d9;
+    }
+    .gpu-meter-fill {
+      fill: #3fb950;
+      transition: width 1.3s ease-in-out;
+    }
+    .gpu-meter-bg {
+      fill: #3d2800;
+      opacity: 0.6;
+    }
+    .gpu-meter-label {
+      fill: #3fb950;
+      font-size: 9px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      letter-spacing: 0.05em;
+    }
+    .node.glow rect:first-of-type {
+      stroke: #bc8cff;
+      filter: drop-shadow(0 0 12px rgba(188,140,255,0.45));
+    }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1>Odyn Network — AWS Infrastructure</h1>
+  <span class="branch">feat/ray-integration-testing-updates</span>
+  <div class="badge">Phase 1</div>
+  <div class="badge green">Ray Cluster</div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input id="search-input" type="text" placeholder="Search components…" autocomplete="off"/>
+    <span id="search-count"></span>
+    <span class="kbd">Esc</span>
+    <span style="font-size:11px;color:#484f58">clear</span>
+  </div>
+</header>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1f4b8c;border:1px solid #58a6ff"></div>AWS Services</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1a3a2a;border:1px solid #3fb950"></div>Ray / ML Layer</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3d1f00;border:1px solid #e3b341"></div>GPU Workers (Multi-cloud)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2d1f4e;border:1px solid #a371f7"></div>Tailscale VPN Overlay</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3a1a1a;border:1px solid #f85149"></div>Monitoring Stack</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#21262d;border:1px solid #30363d"></div>External / Internet</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#111a2a;border:1px solid #58a6ff"></div>Workload Definitions (WDO)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2a1800;border:1px solid #3fb950"></div>Animated GPU Utilisation</div>
+  <span style="margin-left:auto;font-size:11px;color:#484f58">Scroll to zoom · Drag to pan · Click node for details</span>
+</div>
+
+<div class="main-layout">
+
+<div id="canvas-wrap">
+<svg id="diagram" width="1700" height="1130" viewBox="0 0 1700 1130" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="arr-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#58a6ff" opacity="0.8"/></marker>
+  <marker id="arr-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#3fb950" opacity="0.8"/></marker>
+  <marker id="arr-yellow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#e3b341" opacity="0.8"/></marker>
+  <marker id="arr-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a371f7" opacity="0.8"/></marker>
+  <marker id="arr-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f85149" opacity="0.8"/></marker>
+  <marker id="arr-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8b949e" opacity="0.8"/></marker>
+  <filter id="glow-blue" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="glow-green"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <linearGradient id="grad-aws" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#1f4b8c" stop-opacity="0.6"/><stop offset="100%" stop-color="#0d1f40" stop-opacity="0.8"/>
+  </linearGradient>
+  <linearGradient id="grad-gpu" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#3d2800" stop-opacity="0.7"/><stop offset="100%" stop-color="#1a1000" stop-opacity="0.9"/>
+  </linearGradient>
+  <linearGradient id="grad-vpn" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#2d1f4e" stop-opacity="0.5"/><stop offset="100%" stop-color="#140d26" stop-opacity="0.7"/>
+  </linearGradient>
+</defs>
+
+<!-- ═══ INTERNET ZONE ═══ -->
+<rect x="14" y="14" width="222" height="240" rx="10" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+<text x="125" y="34" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600" letter-spacing="1">INTERNET</text>
+
+<g class="node" id="node-buyer" data-id="buyer" data-label="Buyer / API Consumer" data-tip="Buyer / API Consumer&#10;&#10;Calls inference API via REST&#10;POST /v1/clusters/{id}/chat/completions&#10;Authenticates with JWT token (24h lifetime)&#10;Reaches API via ALB (public HTTPS endpoint)">
+  <rect x="30" y="46" width="80" height="50" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="70" y="64" text-anchor="middle" fill="#58a6ff" font-size="15">👤</text>
+  <text x="70" y="80" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="600">Buyer</text>
+  <text x="70" y="91" text-anchor="middle" fill="#8b949e" font-size="9">API Consumer</text>
+</g>
+
+<g class="node" id="node-supplier" data-id="supplier" data-label="Supplier / GPU Provider" data-tip="Supplier / GPU Provider&#10;&#10;Registers GPU nodes via install script:&#10;wget https://install.dev-uat-odyn-marketplace.network/install -O install.sh&#10;sudo bash install.sh --token=TOKEN&#10;Monitors earnings via static dashboard (CloudFront)&#10;Receives per-second GPU revenue">
+  <rect x="126" y="46" width="80" height="50" rx="8" fill="#21262d" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="166" y="64" text-anchor="middle" fill="#3fb950" font-size="15">🖥️</text>
+  <text x="166" y="80" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="600">Supplier</text>
+  <text x="166" y="91" text-anchor="middle" fill="#8b949e" font-size="9">GPU Provider</text>
+</g>
+
+<g class="node" id="node-frontend" data-id="frontend" data-label="React Frontend (SPA)" data-tip="React + TypeScript SPA (Fully Static)&#10;&#10;Pages: Supplier Dashboard, Buyer Marketplace,&#10;Jupyter Proxy, Terminal Proxy&#10;&#10;Build &amp; Deploy:&#10;  GitHub Actions builds static files (npm run build)&#10;  → uploads artifacts to S3 bucket&#10;  → CloudFront serves at public app URL (HTTPS + CDN)&#10;&#10;S3 stores the built frontend files&#10;CloudFront handles HTTPS, caching, global distribution">
+  <rect x="30" y="112" width="190" height="48" rx="8" fill="#21262d" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="125" y="129" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="600">⚛️  React Frontend</text>
+  <text x="125" y="143" text-anchor="middle" fill="#8b949e" font-size="9">Fully Static · TypeScript SPA</text>
+  <text x="125" y="154" text-anchor="middle" fill="#4d7ec8" font-size="9">Served via CloudFront → S3</text>
+</g>
+
+<g class="node" id="node-cicd" data-id="cicd" data-label="GitHub Actions CI/CD" data-tip="GitHub Actions CI/CD&#10;&#10;On merge to dev-integration-testing branch:&#10;&#10;Frontend pipeline:&#10;  npm run build → static files&#10;  aws s3 sync → S3 bucket&#10;  CloudFront serves updated SPA&#10;&#10;Backend (control-plane) pipeline:&#10;  docker build → ECR push&#10;  EC2 host pulls new image during deployment&#10;&#10;Note: No separate ECR for node-agent images yet">
+  <rect x="30" y="174" width="190" height="68" rx="8" fill="#1a1f24" stroke="#6e7681" stroke-width="1.5" stroke-dasharray="5,2"/>
+  <text x="125" y="192" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600">🔧  GitHub Actions CI/CD</text>
+  <text x="125" y="208" text-anchor="middle" fill="#6e7681" font-size="9">Builds &amp; deploys on branch merge</text>
+  <text x="125" y="221" text-anchor="middle" fill="#6e7681" font-size="9">Frontend → S3  ·  Backend → ECR</text>
+  <text x="125" y="234" text-anchor="middle" fill="#4d7ec8" font-size="9">dev-integration-testing branch</text>
+</g>
+
+<!-- ═══ AWS REGION ═══ -->
+<rect x="244" y="14" width="1440" height="768" rx="12" fill="url(#grad-aws)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="264" y="36" fill="#58a6ff" font-size="11" font-weight="700" letter-spacing="1">AWS  us-west-2</text>
+<text x="264" y="50" fill="#4d7ec8" font-size="9">EC2 · EBS · EIP · ECR · ALB · CloudFront · S3 · Security Groups · Terraform-managed</text>
+
+<g class="node" id="node-alb" data-id="alb" data-label="ALB (Application Load Balancer)" data-tip="Application Load Balancer&#10;&#10;Public API entrypoint — sits in the frontend → control-plane path&#10;Receives API traffic (HTTPS) from clients&#10;Forwards requests to Control Plane EC2 :3001&#10;Handles SSL termination and health checks&#10;Security Group: only :443 / :80 exposed publicly">
+  <rect x="260" y="64" width="158" height="60" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="339" y="83" text-anchor="middle" fill="#58a6ff" font-size="14">⚖️</text>
+  <text x="339" y="100" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">ALB</text>
+  <text x="339" y="114" text-anchor="middle" fill="#8b949e" font-size="9">Public API Entrypoint → CP :3001</text>
+</g>
+
+<g class="node" id="node-cloudfront" data-id="cloudfront" data-label="CloudFront (Frontend CDN)" data-tip="AWS CloudFront — Frontend CDN&#10;&#10;Serves the static React SPA at the public app URL&#10;Origin: S3 bucket (static frontend build artifacts)&#10;Handles: HTTPS termination, global edge caching&#10;Users load the SPA from CloudFront URL&#10;Browser then calls ALB for API requests">
+  <rect x="436" y="64" width="168" height="60" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="520" y="83" text-anchor="middle" fill="#58a6ff" font-size="14">☁️</text>
+  <text x="520" y="100" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">CloudFront (Frontend)</text>
+  <text x="520" y="114" text-anchor="middle" fill="#8b949e" font-size="9">CDN · HTTPS · Origin: S3</text>
+</g>
+
+<g class="node" id="node-s3" data-id="s3" data-label="S3 (Frontend Static Files)" data-tip="AWS S3 — Frontend Static Files&#10;&#10;Stores built React SPA artifacts (HTML, JS, CSS, assets)&#10;GitHub Actions uploads build output here on each deploy&#10;CloudFront uses this bucket as its origin&#10;Not publicly accessible directly — only via CloudFront">
+  <rect x="622" y="64" width="144" height="60" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="694" y="83" text-anchor="middle" fill="#58a6ff" font-size="14">🗂️</text>
+  <text x="694" y="100" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">S3 (Frontend)</text>
+  <text x="694" y="114" text-anchor="middle" fill="#8b949e" font-size="9">Static build artifacts</text>
+</g>
+
+<g class="node" id="node-ecr" data-id="ecr" data-label="ECR (Elastic Container Registry)" data-tip="AWS ECR — Elastic Container Registry&#10;&#10;Used today for the control-plane deploy path only&#10;CI/CD builds control-plane Docker image → pushes to ECR&#10;Control Plane EC2 pulls image during deployment&#10;(on merges to dev-integration-testing branch)&#10;&#10;Note: No separate ECR setup for node-agent images yet&#10;Node images pulled directly — separate ECR planned">
+  <rect x="784" y="64" width="158" height="60" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="863" y="83" text-anchor="middle" fill="#58a6ff" font-size="14">📦</text>
+  <text x="863" y="100" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">ECR</text>
+  <text x="863" y="114" text-anchor="middle" fill="#8b949e" font-size="9">Control-plane image · Deploy path</text>
+</g>
+
+<g class="node" id="node-installer" data-id="installer" data-label="Node Agent Installer (CloudFront+S3)" data-tip="Node Agent Installer Distribution&#10;&#10;Separate CloudFront + S3 distribution&#10;URL: install.dev-uat-odyn-marketplace.network&#10;&#10;Onboarding command given to suppliers:&#10;  wget https://install.dev-uat-odyn-marketplace.network/install -O install.sh &amp;&amp; sudo bash install.sh --token=TOKEN&#10;&#10;Serves:&#10;  • install.sh — bootstraps Tailscale + node-agent&#10;  • Release artifacts for initial installs&#10;&#10;Node agent checks hourly for newer version&#10;Auto-updates if a newer release is detected">
+  <rect x="1356" y="24" width="316" height="104" rx="8" fill="#0d2040" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="5,2"/>
+  <text x="1514" y="46" text-anchor="middle" fill="#58a6ff" font-size="10" font-weight="700">📦  Node Agent Installer</text>
+  <text x="1514" y="61" text-anchor="middle" fill="#4d7ec8" font-size="9">CloudFront + S3 distribution</text>
+  <text x="1514" y="76" text-anchor="middle" fill="#8b949e" font-size="9">install.dev-uat-odyn-marketplace.network</text>
+  <text x="1514" y="91" text-anchor="middle" fill="#8b949e" font-size="9">install.sh + release artifacts · Hourly auto-update</text>
+  <text x="1514" y="106" text-anchor="middle" fill="#4d7ec8" font-size="8">wget .../install -O install.sh &amp;&amp; sudo bash install.sh --token=TOKEN</text>
+</g>
+
+<!-- ── Control Plane EC2 ── -->
+<rect x="252" y="146" width="364" height="376" rx="10" fill="#0f2540" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="272" y="168" fill="#58a6ff" font-size="11" font-weight="700">🖥️  Control Plane  EC2  (35.93.57.67:3001)</text>
+<text x="272" y="182" fill="#4d7ec8" font-size="9">Ubuntu 22.04 LTS · AWS us-west-2 · Elastic IP</text>
+
+<g class="node" id="node-go-gin" data-id="go-gin" data-label="Go + Gin API Server" data-tip="Go + Gin HTTP API Server&#10;&#10;Port: 3001 (behind ALB)&#10;Routes: /api/clusters, /api/nodes, /api/supplier, /v1/clusters/{id}/chat&#10;JWT auth: 24h tokens, issuer=odyn.network&#10;FRP embedded server for reverse proxying">
+  <rect x="268" y="192" width="160" height="70" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.2"/>
+  <text x="348" y="211" text-anchor="middle" fill="#58a6ff" font-size="14">🐹</text>
+  <text x="348" y="228" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Go + Gin API Server</text>
+  <text x="348" y="240" text-anchor="middle" fill="#8b949e" font-size="9">HTTP :3001 · JWT Auth</text>
+  <text x="348" y="252" text-anchor="middle" fill="#8b949e" font-size="9">FRP Server :7001 / :8080</text>
+</g>
+
+<g class="node" id="node-grpc" data-id="grpc" data-label="gRPC NodeRegistry Server" data-tip="gRPC NodeRegistry Service&#10;&#10;Port: 50051&#10;Services: Register(), StreamHeartbeat(),&#10;ConnectControlPlane(), ReportCommandStatus(),&#10;ReportContainerAccessState(), ConnectDataTunnel()&#10;Bidirectional streaming for telemetry">
+  <rect x="444" y="192" width="156" height="70" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.2"/>
+  <text x="522" y="211" text-anchor="middle" fill="#58a6ff" font-size="14">⚡</text>
+  <text x="522" y="228" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">gRPC Server</text>
+  <text x="522" y="240" text-anchor="middle" fill="#8b949e" font-size="9">NodeRegistry :50051</text>
+  <text x="522" y="252" text-anchor="middle" fill="#8b949e" font-size="9">Protobuf · Bidirectional</text>
+</g>
+
+<g class="node" id="node-frp" data-id="frp" data-label="FRP Server (Fast Reverse Proxy)" data-tip="FRP — Fast Reverse Proxy (embedded in Go binary)&#10;&#10;TCP bind port: 7001&#10;HTTP vhost port: 8080&#10;Routes: /api/proxy/{containerId}/jupyter&#10;         /api/proxy/{containerId}/terminal&#10;         /api/proxy/{containerId}/inference&#10;Tunnels Jupyter/Terminal WebSocket sessions from GPU nodes">
+  <rect x="268" y="276" width="332" height="68" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.2"/>
+  <text x="434" y="295" text-anchor="middle" fill="#58a6ff" font-size="14">🔀</text>
+  <text x="434" y="312" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">FRP Server (frps)</text>
+  <text x="434" y="324" text-anchor="middle" fill="#8b949e" font-size="9">TCP :7001 · HTTP :8080 · Jupyter / Terminal Proxy</text>
+</g>
+
+<g class="node" id="node-ray-mgr" data-id="ray-mgr" data-label="Ray Cluster Manager" data-tip="Ray Cluster Manager (inside Control Plane)&#10;&#10;Manages Ray cluster lifecycle via DB&#10;Creates cluster record with: head_address, serve_port, model_name&#10;Syncs with Ray Head node via HTTP token&#10;Exposes: POST /api/clusters, DELETE, GET&#10;Auth token: ODYN_RAY_HEAD_SYNC_TOKEN">
+  <rect x="268" y="358" width="332" height="58" rx="8" fill="#1a3a2a" stroke="#3fb950" stroke-width="1.2"/>
+  <text x="434" y="378" text-anchor="middle" fill="#3fb950" font-size="13">🌐</text>
+  <text x="434" y="395" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Ray Cluster Manager</text>
+  <text x="434" y="407" text-anchor="middle" fill="#8b949e" font-size="9">Cluster lifecycle · DB state · ODYN_RAY_HEAD_SYNC_TOKEN auth</text>
+</g>
+
+<g class="node" id="node-cloud-clients" data-id="cloud-clients" data-label="Multi-Cloud Provider Clients" data-tip="Multi-Cloud GPU Provider Clients&#10;&#10;Integrations: Lambda.ai, Runpod, Scaleway,&#10;Nebius, TensorDock, Crusoe, Verda, Hetzner, Vultr&#10;Per-provider timeout env vars&#10;Handles: create, restart, terminate, list offers">
+  <rect x="268" y="428" width="332" height="62" rx="8" fill="#1a2a3a" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <text x="434" y="448" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="700">☁️  Multi-Cloud Provider Clients</text>
+  <text x="434" y="463" text-anchor="middle" fill="#8b949e" font-size="9">Lambda · Runpod · Scaleway · Nebius · TensorDock</text>
+  <text x="434" y="476" text-anchor="middle" fill="#8b949e" font-size="9">Crusoe · Verda · Hetzner · Vultr · GPU capacity acquisition</text>
+</g>
+
+<g class="node" id="node-eip" data-id="eip" data-label="AWS Elastic IP (Control Plane)" data-tip="AWS Elastic IP&#10;&#10;Stable public IP for Control Plane EC2&#10;Allocated in us-west-2 · Tagged: odyn-controlplane">
+  <rect x="268" y="496" width="80" height="22" rx="5" fill="#0d2040" stroke="#58a6ff" stroke-width="1"/>
+  <text x="308" y="511" text-anchor="middle" fill="#58a6ff" font-size="9" font-weight="600">🌐 EIP</text>
+</g>
+
+<g class="node" id="node-sg-cp" data-id="sg-cp" data-label="Security Group (Control Plane)" data-tip="AWS Security Group: odyn-controlplane&#10;&#10;Inbound: 22 (SSH), 3001 (API from ALB), 50051 (gRPC),&#10;         7001 (FRP TCP), 8080 (FRP HTTP)&#10;Outbound: All (0.0.0.0/0)">
+  <rect x="360" y="496" width="112" height="22" rx="5" fill="#0d2040" stroke="#58a6ff" stroke-width="1"/>
+  <text x="416" y="511" text-anchor="middle" fill="#58a6ff" font-size="9" font-weight="600">🛡️ Security Group</text>
+</g>
+
+<g class="node" id="node-wdo-hub" data-id="wdo-hub" data-label="Workload Definition Hub" data-tip="Workload Definition Hub&#10;&#10;Transforms digestor output into structured WDO templates&#10;Feeds Shivani &amp; Mrunali reconstitution recovery loops&#10;Feeds Akarsh unified compute heterogeneous test sweeps&#10;Tracks checkpoint cadence, GPU tiers, CPU / memory bands">
+  <rect x="1110" y="188" width="320" height="120" rx="10" fill="#101b2c" stroke="#58a6ff" stroke-width="1.4"/>
+  <text x="1270" y="208" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="700">📥  Workload Definition Hub</text>
+  <text x="1270" y="222" text-anchor="middle" fill="#8b949e" font-size="9">Digestor → Structured WDO · Scenario templates</text>
+  <text x="1270" y="235" text-anchor="middle" fill="#4d7ec8" font-size="9">Captures SLOs · checkpoint cadence · GPU tiers</text>
+  <g class="wdo-chip" data-wdo="reconstitution">
+    <rect x="1124" y="244" width="140" height="52"/>
+    <text x="1194" y="264">♻️ Reconstitution WDO</text>
+    <text x="1194" y="277">type=batch · checkpoint=30s</text>
+  </g>
+  <g class="wdo-chip" data-wdo="unified">
+    <rect x="1286" y="244" width="140" height="52"/>
+    <text x="1356" y="264">🧪 Unified Compute WDO</text>
+    <text x="1356" y="277">gpu≥1 A100 · cpu≥8 · mem≥32GB</text>
+  </g>
+</g>
+
+<g class="node" id="node-reconstitution" data-id="reconstitution" data-label="Reconstitution Orchestrator (Shivani &amp; Mrunali)" data-tip="Reconstitution Orchestrator — Shivani Beri &amp; Mrunali Patil&#10;&#10;Ray actors: CheckpointWriter, RecoveryManager, ReassemblyEngine&#10;Incremental snapshots → S3, replay timeline <30s&#10;Restores partial progress, reschedules missing shards&#10;Exposes state via Ray Serve for control-plane introspection">
+  <rect x="1110" y="324" width="320" height="116" rx="10" fill="#1a1530" stroke="#a371f7" stroke-width="1.4"/>
+  <text x="1270" y="346" text-anchor="middle" fill="#a371f7" font-size="12" font-weight="700">♻️  Reconstitution Orchestrator</text>
+  <text x="1270" y="362" text-anchor="middle" fill="#8b71c0" font-size="9">Fault detection · checkpoints · recovery manager</text>
+  <text x="1270" y="376" text-anchor="middle" fill="#8b949e" font-size="9">Ray tasks replay shards → state reconciliation</text>
+  <text x="1270" y="390" text-anchor="middle" fill="#8b949e" font-size="9">S3 incremental checkpoints · object store integration</text>
+  <text x="1270" y="404" text-anchor="middle" fill="#4d7ec8" font-size="9">Serve endpoint: /ops/reconstitution · health+metrics</text>
+</g>
+
+<g class="node" id="node-unified" data-id="unified" data-label="Unified Compute Test Harness (Akarsh)" data-tip="Unified Compute Test Harness — Akarsh B.&#10;&#10;HardwareRequirement dataclass feeds GPU / CPU filters&#10;Sweeps heterogeneous clusters: V100, A100, CPU-only&#10;Validates autoscaler scoring &amp; unified compute workload mix&#10;Outputs JSON telemetry for Prometheus + Grafana overlays">
+  <rect x="1110" y="456" width="320" height="110" rx="10" fill="#0f2130" stroke="#58a6ff" stroke-width="1.4"/>
+  <text x="1270" y="476" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="700">🧪  Unified Compute Test Harness</text>
+  <text x="1270" y="492" text-anchor="middle" fill="#8b949e" font-size="9">Schedules mixed GPU tiers · latency + throughput sweeps</text>
+  <text x="1270" y="506" text-anchor="middle" fill="#8b949e" font-size="9">HardwareRequirement → Ray jobs (batch + streaming)</text>
+  <text x="1270" y="520" text-anchor="middle" fill="#4d9e66" font-size="9">Reports utilisation envelopes → autoscaler hints</text>
+  <text x="1270" y="534" text-anchor="middle" fill="#4d7ec8" font-size="9">JSON output published to monitoring pipeline</text>
+</g>
+
+<!-- ── odyn-postgres EC2 ── -->
+<rect x="252" y="538" width="364" height="100" rx="10" fill="#0f2540" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="272" y="560" fill="#58a6ff" font-size="11" font-weight="700">🗄️  odyn-postgres  EC2</text>
+<text x="272" y="574" fill="#4d7ec8" font-size="9">Dedicated database instance · Separate deployment surface · us-west-2</text>
+
+<g class="node" id="node-postgres" data-id="postgres" data-label="PostgreSQL 17 Database" data-tip="PostgreSQL 17 Database&#10;&#10;Port: 5432&#10;DB: marketplace&#10;Tables: clusters, nodes, containers,&#10;earnings, sessions, container_telemetry&#10;20+ migrations · Hosted on dedicated odyn-postgres EC2&#10;EBS 30GB gp3 volume (not on control-plane EC2)">
+  <rect x="268" y="582" width="332" height="48" rx="8" fill="#1a3a6a" stroke="#58a6ff" stroke-width="1.2"/>
+  <text x="434" y="600" text-anchor="middle" fill="#58a6ff" font-size="14">🗄️</text>
+  <text x="434" y="617" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">PostgreSQL 17 · :5432 · DB: marketplace · EBS 30GB gp3</text>
+</g>
+
+<!-- ── Ray Head EC2 ── -->
+<rect x="638" y="146" width="448" height="632" rx="10" fill="#0d2218" stroke="#3fb950" stroke-width="1.5"/>
+<text x="658" y="168" fill="#3fb950" font-size="11" font-weight="700">🌿  Ray Head Node  EC2  (100.102.64.114 / Tailscale)</text>
+<text x="658" y="182" fill="#2a6a40" font-size="9">Python 3.10.12-slim · Ray 2.54.0 · Ports: 6379, 8000, 8265, 8002</text>
+
+<g class="node" id="node-ray-core" data-id="ray-core" data-label="Ray Core (GCS :6379)" data-tip="Ray Core — Global Control Store&#10;&#10;Port: 6379 (GCS)&#10;Ray 2.54.0 [serve]&#10;Manages cluster membership, object store&#10;Workers connect via: ray start --address=HEAD:6379&#10;Node IP via Tailscale: 100.102.64.114">
+  <rect x="654" y="192" width="196" height="70" rx="8" fill="#1a3a2a" stroke="#3fb950" stroke-width="1.2"/>
+  <text x="752" y="211" text-anchor="middle" fill="#3fb950" font-size="14">☀️</text>
+  <text x="752" y="228" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Ray Core (GCS)</text>
+  <text x="752" y="240" text-anchor="middle" fill="#8b949e" font-size="9">:6379 · Ray 2.54.0</text>
+  <text x="752" y="252" text-anchor="middle" fill="#8b949e" font-size="9">Tailscale: 100.102.64.114</text>
+</g>
+
+<g class="node" id="node-ray-dash" data-id="ray-dash" data-label="Ray Dashboard (:8265)" data-tip="Ray Dashboard&#10;&#10;Port: 8265&#10;Job submission · Cluster monitoring&#10;Auto-generates Prometheus session dashboards to /tmp/ray&#10;Proxied by FastAPI health server">
+  <rect x="862" y="192" width="196" height="70" rx="8" fill="#1a3a2a" stroke="#3fb950" stroke-width="1.2"/>
+  <text x="960" y="211" text-anchor="middle" fill="#3fb950" font-size="14">📊</text>
+  <text x="960" y="228" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Ray Dashboard</text>
+  <text x="960" y="240" text-anchor="middle" fill="#8b949e" font-size="9">:8265 · Job submission</text>
+  <text x="960" y="252" text-anchor="middle" fill="#8b949e" font-size="9">Session dashboards → /tmp/ray</text>
+</g>
+
+<g class="node" id="node-ray-serve" data-id="ray-serve" data-label="Ray Serve + vLLM Deployment" data-tip="Ray Serve — vLLM Deployment&#10;&#10;Port: 8000 (OpenAI-compatible)&#10;Route: /v1/chat/completions&#10;vLLMDeployment class: spawns vLLM subprocess on :9000&#10;Replicas: configurable (NUM_REPLICAS env)&#10;Models: Llama-3.1-8B, Qwen2.5-32B, etc.&#10;GPU_MEMORY_UTILIZATION=0.85–0.90&#10;TENSOR_PARALLEL_SIZE configurable">
+  <rect x="654" y="278" width="404" height="72" rx="8" fill="#0f2a1a" stroke="#3fb950" stroke-width="1.5" filter="url(#glow-green)"/>
+  <text x="856" y="298" text-anchor="middle" fill="#3fb950" font-size="13" font-weight="700">🚀  Ray Serve  +  vLLM Deployment</text>
+  <text x="856" y="315" text-anchor="middle" fill="#8b949e" font-size="9">Port :8000 · OpenAI-compatible /v1/chat/completions</text>
+  <text x="856" y="329" text-anchor="middle" fill="#8b949e" font-size="9">vLLMDeployment → spawns vLLM subprocess :9000</text>
+  <text x="856" y="342" text-anchor="middle" fill="#4d9e66" font-size="9">Models: Llama-3.1-8B · Qwen2.5-32B · all-MiniLM-L6-v2</text>
+</g>
+
+<g class="node" id="node-autoscaler" data-id="autoscaler" data-label="Ray Autoscaler" data-tip="Ray Autoscaler&#10;&#10;Env: ODYN_AUTOSCALE_ENABLED=true&#10;Poll interval: 30s&#10;Scale up trigger: queue depth > 5.0&#10;Scale down trigger: queue depth &lt; 0.5&#10;Min workers: ODYN_MIN_WORKERS (default 1)&#10;Max workers: ODYN_MAX_WORKERS (default 10)&#10;Calls control-plane HTTP API to add/remove workers">
+  <rect x="654" y="364" width="192" height="58" rx="8" fill="#1a3a2a" stroke="#3fb950" stroke-width="1.2"/>
+  <text x="750" y="383" text-anchor="middle" fill="#3fb950" font-size="13">📈</text>
+  <text x="750" y="400" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Autoscaler</text>
+  <text x="750" y="413" text-anchor="middle" fill="#8b949e" font-size="9">30s poll · queue depth threshold</text>
+</g>
+
+<g class="node" id="node-fastapi" data-id="fastapi" data-label="FastAPI Health Server (:8002)" data-tip="FastAPI Health Server&#10;&#10;Port: 8002&#10;Endpoints: /health, /metrics&#10;Proxies: Ray Dashboard (8265), Grafana (3000), Prometheus (9090)&#10;Exposes cluster status to control plane&#10;Ray Metrics Export: :8081">
+  <rect x="860" y="364" width="196" height="58" rx="8" fill="#1a3a2a" stroke="#3fb950" stroke-width="1.2"/>
+  <text x="958" y="383" text-anchor="middle" fill="#3fb950" font-size="13">🏥</text>
+  <text x="958" y="400" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">FastAPI Health :8002</text>
+  <text x="958" y="413" text-anchor="middle" fill="#8b949e" font-size="9">Metrics :8081 · Dashboard proxy</text>
+</g>
+
+<g class="node" id="node-ray-metrics" data-id="ray-metrics" data-label="Prometheus Metrics Export (:8081)" data-tip="Ray Prometheus Metrics&#10;&#10;Export port: 8081&#10;File service discovery: /tmp/ray/prom_metrics_service_discovery.json&#10;Metrics: ray_* (GCS, object store, serve, actors)&#10;Scraped by Prometheus running in the monitoring sub-stack below">
+  <rect x="654" y="436" width="404" height="46" rx="8" fill="#1a3a2a" stroke="#2a6a40" stroke-width="1"/>
+  <text x="856" y="456" text-anchor="middle" fill="#3fb950" font-size="10" font-weight="700">📡  Prometheus Metrics Export  :8081</text>
+  <text x="856" y="471" text-anchor="middle" fill="#8b949e" font-size="9">File SD: /tmp/ray/prom_metrics_service_discovery.json · Scraped internally</text>
+</g>
+
+<g class="node" id="node-hf-hub" data-id="hf-hub" data-label="HuggingFace Hub (Model Download)" data-tip="HuggingFace Model Hub&#10;&#10;Token: HF_TOKEN env var&#10;Cache: /opt/odyn/models on GPU workers&#10;Models: meta-llama/Llama-3.1-8B-Instruct,&#10;         Qwen/Qwen2.5-32B-Instruct,&#10;         sentence-transformers/all-MiniLM-L6-v2&#10;Downloaded on first inference request">
+  <rect x="654" y="496" width="404" height="52" rx="8" fill="#0f2040" stroke="#e3b341" stroke-width="1.2"/>
+  <text x="856" y="516" text-anchor="middle" fill="#e3b341" font-size="13">🤗</text>
+  <text x="856" y="533" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">HuggingFace Hub · Model download · HF_TOKEN</text>
+  <text x="856" y="542" text-anchor="middle" fill="#8b949e" font-size="9">Llama-3.1-8B · Qwen2.5-32B · all-MiniLM-L6-v2</text>
+</g>
+
+<!-- ── Monitoring Stack ── -->
+<rect x="654" y="562" width="406" height="200" rx="8" fill="#1a0808" stroke="#f85149" stroke-width="1.5"/>
+<text x="674" y="584" fill="#f85149" font-size="10" font-weight="700">📊  Monitoring Stack EC2  (t3.small · Terraform)</text>
+<text x="674" y="597" fill="#6e3030" font-size="9">Scoped to Ray / ML layer only · EIP · 30GB gp3 EBS · odyn-monitoring SG</text>
+
+<g class="node" id="node-prometheus" data-id="prometheus" data-label="Prometheus (:9090)" data-tip="Prometheus&#10;&#10;Port: 9090&#10;Retention: 30 days (TSDB on EBS)&#10;Scrape sources (federated):&#10;  • Ray metrics: localhost:8081 (file SD)&#10;  • vLLM A100 chat: 202.78.161.249:9001 (socat relay)&#10;  • vLLM A100 embeddings: 202.78.161.249:8001&#10;  • Self: localhost:9090&#10;Observes Ray/ML layer only — not the full platform">
+  <rect x="660" y="606" width="186" height="68" rx="8" fill="#3a1010" stroke="#f85149" stroke-width="1.2"/>
+  <text x="753" y="626" text-anchor="middle" fill="#f85149" font-size="14">🔥</text>
+  <text x="753" y="643" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Prometheus</text>
+  <text x="753" y="656" text-anchor="middle" fill="#8b949e" font-size="9">:9090 · 30d retention</text>
+  <text x="753" y="668" text-anchor="middle" fill="#8b949e" font-size="9">Federated scrape (Ray layer)</text>
+</g>
+
+<g class="node" id="node-grafana" data-id="grafana" data-label="Grafana (:3000)" data-tip="Grafana&#10;&#10;Port: 3000&#10;Datasource: Prometheus (provisioned)&#10;Anonymous access enabled&#10;Dashboards: Ray cluster, vLLM inference, GPU metrics&#10;Provisioned from /monitoring/aws/grafana/&#10;Volumes: grafana_data persisted on EBS">
+  <rect x="858" y="606" width="186" height="68" rx="8" fill="#3a1010" stroke="#f85149" stroke-width="1.2"/>
+  <text x="951" y="626" text-anchor="middle" fill="#f85149" font-size="14">📈</text>
+  <text x="951" y="643" text-anchor="middle" fill="#e6edf3" font-size="10" font-weight="700">Grafana</text>
+  <text x="951" y="656" text-anchor="middle" fill="#8b949e" font-size="9">:3000 · Anonymous access</text>
+  <text x="951" y="668" text-anchor="middle" fill="#8b949e" font-size="9">Ray / vLLM dashboards</text>
+</g>
+
+<g>
+  <rect x="790" y="686" width="130" height="22" rx="5" fill="#1a0808" stroke="#f85149" stroke-width="1"/>
+  <text x="855" y="701" text-anchor="middle" fill="#f85149" font-size="9" font-weight="600">🛡️ odyn-monitoring SG</text>
+</g>
+<text x="932" y="701" fill="#6e3030" font-size="9" font-style="italic">Ray-layer observability only</text>
+
+<!-- ═══ TAILSCALE VPN OVERLAY ═══ -->
+<rect x="14" y="798" width="1670" height="96" rx="12" fill="url(#grad-vpn)" stroke="#a371f7" stroke-width="1.5" stroke-dasharray="8,4"/>
+<text x="34" y="820" fill="#a371f7" font-size="11" font-weight="700">🔐  Tailscale VPN Overlay Network  —  100.64.0.0/10</text>
+<text x="34" y="834" fill="#6e4db8" font-size="9">Bidirectional TCP · Ray GCS :6379 · Replaces AWS private subnets for cross-node Ray communication</text>
+
+<g class="node" id="node-ts-head" data-id="ts-head" data-label="Ray Head Tailscale IP (100.102.64.114)" data-tip="Ray Head Tailscale IP&#10;&#10;Address: 100.102.64.114&#10;Used as node-ip-address for Ray&#10;GCS port: 6379 reachable from all workers via VPN&#10;Env: RAY_HEAD_NODE_IP=100.102.64.114">
+  <rect x="200" y="846" width="180" height="36" rx="7" fill="#2d1f4e" stroke="#a371f7" stroke-width="1.2"/>
+  <text x="290" y="860" text-anchor="middle" fill="#a371f7" font-size="9" font-weight="700">Ray Head: 100.102.64.114</text>
+  <text x="290" y="874" text-anchor="middle" fill="#8b949e" font-size="9">GCS :6379 · Dashboard :8265</text>
+</g>
+
+<g class="node" id="node-ts-a100" data-id="ts-a100" data-label="A100 Worker Tailscale IP (100.92.148.18)" data-tip="A100 Worker Tailscale IP&#10;&#10;Address: 100.92.148.18&#10;8× NVIDIA A100 GPUs&#10;vLLM chat: :9001 (socat relay), embeddings: :8001&#10;Connects to Ray head via: ray start --address=100.102.64.114:6379">
+  <rect x="450" y="846" width="180" height="36" rx="7" fill="#2d1f4e" stroke="#a371f7" stroke-width="1.2"/>
+  <text x="540" y="860" text-anchor="middle" fill="#a371f7" font-size="9" font-weight="700">A100 Worker: 100.92.148.18</text>
+  <text x="540" y="874" text-anchor="middle" fill="#8b949e" font-size="9">8× A100 · Chat :9001 · Emb :8001</text>
+</g>
+
+<g class="node" id="node-ts-h100" data-id="ts-h100" data-label="H100/DGX Tailscale IP (202.78.161.249)" data-tip="H100 Worker Tailscale IP&#10;&#10;Address: 202.78.161.249&#10;NVIDIA H100 / DGX Spark (Blackwell sm_121a)&#10;CUDA 12.9 · Qwen2.5-32B-Instruct&#10;Prometheus federated: :9090">
+  <rect x="700" y="846" width="180" height="36" rx="7" fill="#2d1f4e" stroke="#a371f7" stroke-width="1.2"/>
+  <text x="790" y="860" text-anchor="middle" fill="#a371f7" font-size="9" font-weight="700">H100/DGX: 202.78.161.249</text>
+  <text x="790" y="874" text-anchor="middle" fill="#8b949e" font-size="9">H100 Blackwell · CUDA 12.9</text>
+</g>
+
+<g>
+  <text x="970" y="858" fill="#6e4db8" font-size="9" font-style="italic">Other GPU nodes join via Tailscale on install</text>
+  <text x="970" y="873" fill="#6e4db8" font-size="9" font-style="italic">install_odyn_node.sh bootstraps Tailscale + node-agent</text>
+</g>
+
+<!-- ═══ GPU WORKER NODES ═══ -->
+<rect x="14" y="908" width="1670" height="208" rx="12" fill="url(#grad-gpu)" stroke="#e3b341" stroke-width="1.5"/>
+<text x="34" y="930" fill="#e3b341" font-size="11" font-weight="700">🖥️  GPU Worker Nodes  (Multi-cloud / On-prem)</text>
+<text x="34" y="944" fill="#8b6000" font-size="9">Node-Agent (Go daemon) · Docker runtime · HostNetwork=true · XFS workspace quotas</text>
+
+<g class="node" id="node-agent" data-id="node-agent" data-label="Node Agent (Go Daemon)" data-tip="Node Agent (Go Daemon)&#10;&#10;Runs on every GPU host&#10;Responsibilities:&#10;  • Docker container lifecycle management&#10;  • gRPC client → Control Plane :50051&#10;  • FRP client (frpc) → Control Plane :7001&#10;  • XFS workspace quota management&#10;  • Preflight validation on startup&#10;  • Hourly auto-update check against installer distribution&#10;Install: install.sh bootstraps Tailscale + node-agent">
+  <rect x="30" y="956" width="220" height="150" rx="10" fill="#2a1800" stroke="#e3b341" stroke-width="1.5"/>
+  <text x="140" y="976" text-anchor="middle" fill="#e3b341" font-size="11" font-weight="700">Node Agent (Go)</text>
+  <text x="140" y="990" text-anchor="middle" fill="#8b6000" font-size="9">Daemon on every GPU host</text>
+  <rect x="44" y="998" width="192" height="24" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="140" y="1014" text-anchor="middle" fill="#e3b341" font-size="9">🐳 Docker container lifecycle</text>
+  <rect x="44" y="1026" width="192" height="24" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="140" y="1042" text-anchor="middle" fill="#e3b341" font-size="9">⚡ gRPC client → CP :50051</text>
+  <rect x="44" y="1054" width="192" height="24" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="140" y="1070" text-anchor="middle" fill="#e3b341" font-size="9">🔀 FRP client → CP :7001</text>
+  <rect x="44" y="1082" width="192" height="24" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="140" y="1098" text-anchor="middle" fill="#e3b341" font-size="9">📁 XFS quota · workspace mgmt</text>
+</g>
+
+<g class="node" id="node-a100" data-id="a100" data-label="A100 Worker Container (gcore-a100)" data-tip="A100 GPU Worker Container&#10;&#10;Base: nvidia/cuda:12.4-devel-ubuntu22.04&#10;GPUs: 8× NVIDIA A100 (gcore-a100 host)&#10;Mode: HostNetwork=true&#10;vLLM inference: :9000&#10;Chat endpoint: :9001 (socat relay from :9000)&#10;Embeddings: all-MiniLM-L6-v2 :8001&#10;Model cache: /opt/odyn/models">
+  <rect x="278" y="956" width="240" height="150" rx="10" fill="#2a1800" stroke="#e3b341" stroke-width="1.5"/>
+  <text x="398" y="976" text-anchor="middle" fill="#e3b341" font-size="11" font-weight="700">🟢 A100 Worker Container</text>
+  <text x="398" y="990" text-anchor="middle" fill="#8b6000" font-size="9">nvidia/cuda:12.4 · 8× A100 · gcore-a100</text>
+  <rect x="292" y="998" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="398" y="1013" text-anchor="middle" fill="#e3b341" font-size="9">vLLM server :9000 (HostNetwork)</text>
+  <rect x="292" y="1024" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="398" y="1039" text-anchor="middle" fill="#e3b341" font-size="9">Qwen2.5-32B-Instruct (Chat)</text>
+  <rect x="292" y="1050" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="398" y="1065" text-anchor="middle" fill="#e3b341" font-size="9">all-MiniLM-L6-v2 (Embeddings)</text>
+  <rect x="292" y="1076" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="398" y="1091" text-anchor="middle" fill="#e3b341" font-size="9">ray start --address=HEAD:6379</text>
+  <rect x="292" y="1088" width="212" height="6" rx="3" class="gpu-meter-bg"/>
+  <rect x="292" y="1088" width="0" height="6" rx="3" class="gpu-meter-fill" data-gpu="a100" data-width="212"/>
+  <text x="398" y="1102" text-anchor="middle" class="gpu-meter-label" data-gpu-label="a100">GPU Load · 0%</text>
+</g>
+
+<g class="node" id="node-h100" data-id="h100" data-label="H100 / DGX Spark Container" data-tip="H100 / DGX Spark Worker Container&#10;&#10;Base: nvidia/cuda:12.9.0-devel-ubuntu22.04&#10;GPU: NVIDIA H100 / Blackwell (sm_121a)&#10;CUDA 12.9 · Triton JIT with ptxas&#10;Mode: HostNetwork=true&#10;vLLM: :8000 · Dashboard: :8265&#10;Also runs local Prometheus (Prometheus federation to Ray monitoring)">
+  <rect x="546" y="956" width="240" height="150" rx="10" fill="#2a1800" stroke="#e3b341" stroke-width="1.5"/>
+  <text x="666" y="976" text-anchor="middle" fill="#e3b341" font-size="11" font-weight="700">🔴 H100 / DGX Spark</text>
+  <text x="666" y="990" text-anchor="middle" fill="#8b6000" font-size="9">nvidia/cuda:12.9 · H100 Blackwell · dgx-spark</text>
+  <rect x="560" y="998" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="666" y="1013" text-anchor="middle" fill="#e3b341" font-size="9">vLLM :8000 · Dashboard :8265</text>
+  <rect x="560" y="1024" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="666" y="1039" text-anchor="middle" fill="#e3b341" font-size="9">Qwen2.5-32B (sm_121a / Triton)</text>
+  <rect x="560" y="1050" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="666" y="1065" text-anchor="middle" fill="#e3b341" font-size="9">Prometheus :9090 (federated)</text>
+  <rect x="560" y="1076" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="666" y="1091" text-anchor="middle" fill="#e3b341" font-size="9">ray start --address=HEAD:6379</text>
+  <rect x="560" y="1088" width="212" height="6" rx="3" class="gpu-meter-bg"/>
+  <rect x="560" y="1088" width="0" height="6" rx="3" class="gpu-meter-fill" data-gpu="h100" data-width="212"/>
+  <text x="666" y="1102" text-anchor="middle" class="gpu-meter-label" data-gpu-label="h100">GPU Load · 0%</text>
+</g>
+
+<g class="node" id="node-runtime" data-id="runtime" data-label="Runtime Container (Jupyter + Terminal)" data-tip="Runtime Container (Node-Agent managed)&#10;&#10;Base: nvidia/cuda:12.4.0-runtime-ubuntu22.04&#10;Purpose: Jupyter workspace + terminal for GPU buyers&#10;Jupyter: :8888 (tunneled via FRP)&#10;Terminal (ttyd): :7681 (tunneled via FRP)&#10;Workspace: /workspace with XFS quota&#10;Base URL routing: /api/proxy/{containerId}/jupyter">
+  <rect x="814" y="956" width="240" height="150" rx="10" fill="#2a1800" stroke="#e3b341" stroke-width="1.5"/>
+  <text x="934" y="976" text-anchor="middle" fill="#e3b341" font-size="11" font-weight="700">🟡 Runtime Container</text>
+  <text x="934" y="990" text-anchor="middle" fill="#8b6000" font-size="9">nvidia/cuda:12.4.0-runtime · Jupyter + ttyd</text>
+  <rect x="828" y="998" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="934" y="1013" text-anchor="middle" fill="#e3b341" font-size="9">Jupyter Lab :8888</text>
+  <rect x="828" y="1024" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="934" y="1039" text-anchor="middle" fill="#e3b341" font-size="9">Terminal (ttyd) :7681</text>
+  <rect x="828" y="1050" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="934" y="1065" text-anchor="middle" fill="#e3b341" font-size="9">FRP tunnel → Control Plane</text>
+  <rect x="828" y="1076" width="212" height="22" rx="5" fill="#3d2800" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="934" y="1091" text-anchor="middle" fill="#e3b341" font-size="9">XFS workspace quota /workspace</text>
+</g>
+
+<g class="node" id="node-gpu-sources" data-id="gpu-sources" data-label="GPU Capacity Sources (Cloud Providers)" data-tip="GPU Capacity Sources&#10;&#10;Acquired via Control Plane cloud provider clients&#10;Providers: Lambda.ai, Runpod, Scaleway, Nebius,&#10;TensorDock, Crusoe, Verda, Hetzner, Vultr&#10;Workers register via install.sh after provisioning&#10;Tailscale enrolled on join">
+  <rect x="1082" y="956" width="424" height="150" rx="10" fill="#1a1400" stroke="#e3b341" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="1294" y="982" text-anchor="middle" fill="#e3b341" font-size="11" font-weight="700">☁️  GPU Capacity Sources</text>
+  <text x="1294" y="997" text-anchor="middle" fill="#8b6000" font-size="9">Acquired via Control Plane cloud provider clients</text>
+  <rect x="1092" y="1008" width="80" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1132" y="1023" text-anchor="middle" fill="#e3b341" font-size="9">Lambda.ai</text>
+  <rect x="1182" y="1008" width="80" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1222" y="1023" text-anchor="middle" fill="#e3b341" font-size="9">Runpod</text>
+  <rect x="1272" y="1008" width="80" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1312" y="1023" text-anchor="middle" fill="#e3b341" font-size="9">Scaleway</text>
+  <rect x="1362" y="1008" width="80" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1402" y="1023" text-anchor="middle" fill="#e3b341" font-size="9">Nebius</text>
+  <rect x="1092" y="1038" width="90" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1137" y="1053" text-anchor="middle" fill="#e3b341" font-size="9">TensorDock</text>
+  <rect x="1192" y="1038" width="80" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1232" y="1053" text-anchor="middle" fill="#e3b341" font-size="9">Crusoe</text>
+  <rect x="1282" y="1038" width="70" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1317" y="1053" text-anchor="middle" fill="#e3b341" font-size="9">Verda</text>
+  <rect x="1362" y="1038" width="80" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1402" y="1053" text-anchor="middle" fill="#e3b341" font-size="9">Hetzner</text>
+  <rect x="1092" y="1068" width="70" height="22" rx="5" fill="#2a1a00" stroke="#e3b341" stroke-width="0.8"/>
+  <text x="1127" y="1083" text-anchor="middle" fill="#e3b341" font-size="9">Vultr</text>
+  <text x="1294" y="1100" text-anchor="middle" fill="#8b6000" font-size="9" font-style="italic">Workers register via install.sh · Tailscale enrolled on join</text>
+</g>
+
+<!-- ═══ CONNECTIONS ═══ -->
+
+<line id="c1" class="conn" x1="125" y1="112" x2="125" y2="96" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr-blue)" opacity="0.8" data-from="buyer" data-to="cloudfront" data-label="load SPA"/>
+
+<path id="c2" class="conn" d="M 220 198 C 380 198 500 80 622 94" stroke="#8b949e" stroke-width="1.2" fill="none" marker-end="url(#arr-gray)" opacity="0.7" stroke-dasharray="5,3" data-from="cicd" data-to="s3" data-label="deploy static files"/>
+<text x="440" y="158" fill="#8b949e" font-size="8" font-style="italic">deploy static files</text>
+
+<path id="c3" class="conn" d="M 220 210 C 500 210 650 80 784 94" stroke="#8b949e" stroke-width="1.2" fill="none" marker-end="url(#arr-gray)" opacity="0.7" stroke-dasharray="5,3" data-from="cicd" data-to="ecr" data-label="push image"/>
+<text x="600" y="148" fill="#8b949e" font-size="8" font-style="italic">push image</text>
+
+<line id="c4" class="conn" x1="622" y1="94" x2="604" y2="94" stroke="#58a6ff" stroke-width="1.2" marker-end="url(#arr-blue)" opacity="0.6" data-from="s3" data-to="cloudfront" data-label="S3 origin"/>
+
+<path id="c5" class="conn" d="M 863 124 Q 863 150 600 168" stroke="#58a6ff" stroke-width="1.2" fill="none" marker-end="url(#arr-blue)" opacity="0.6" stroke-dasharray="4,2" data-from="ecr" data-to="go-gin" data-label="pull on deploy"/>
+<text x="740" y="148" fill="#58a6ff" font-size="8">pull on deploy</text>
+
+<path id="c6" class="conn" d="M 220 130 C 250 130 250 95 260 95" stroke="#58a6ff" stroke-width="1.5" fill="none" marker-end="url(#arr-blue)" opacity="0.8" stroke-dasharray="5,3" data-from="frontend" data-to="alb" data-label="API calls (HTTPS)"/>
+<text x="224" y="118" fill="#58a6ff" font-size="8">API calls</text>
+
+<line id="c7" class="conn" x1="339" y1="124" x2="339" y2="192" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr-blue)" opacity="0.8" data-from="alb" data-to="go-gin" data-label="forward :3001"/>
+<text x="344" y="160" fill="#58a6ff" font-size="8">:3001</text>
+
+<line id="c8" class="conn" x1="616" y1="246" x2="638" y2="246" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr-green)" opacity="0.8" data-from="ray-mgr" data-to="ray-core" data-label="HTTP sync token"/>
+<text x="618" y="238" fill="#3fb950" font-size="8">Sync token</text>
+
+<path id="c9" class="conn" d="M 434 522 Q 434 540 434 554" stroke="#58a6ff" stroke-width="1.2" fill="none" marker-end="url(#arr-blue)" opacity="0.7" stroke-dasharray="4,2" data-from="go-gin" data-to="postgres" data-label=":5432"/>
+<text x="438" y="542" fill="#58a6ff" font-size="8">:5432</text>
+
+<path id="c10" class="conn" d="M 616 387 Q 630 387 638 340" stroke="#3fb950" stroke-width="1.2" fill="none" marker-end="url(#arr-green)" opacity="0.7" stroke-dasharray="4,2" data-from="ray-mgr" data-to="ray-serve" data-label="cluster lifecycle"/>
+
+<line id="c11" class="conn" x1="856" y1="778" x2="790" y2="798" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr-purple)" opacity="0.8" stroke-dasharray="6,3" data-from="ray-core" data-to="ts-head" data-label="Tailscale :6379"/>
+<text x="812" y="794" fill="#a371f7" font-size="8">Tailscale :6379</text>
+
+<line id="c12" class="conn" x1="290" y1="882" x2="140" y2="908" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr-purple)" opacity="0.8" data-from="ts-head" data-to="node-agent" data-label="VPN → worker"/>
+<line id="c13" class="conn" x1="540" y1="882" x2="398" y2="908" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr-purple)" opacity="0.8" data-from="ts-a100" data-to="a100" data-label="VPN → A100"/>
+<line id="c14" class="conn" x1="790" y1="882" x2="666" y2="908" stroke="#a371f7" stroke-width="1.5" marker-end="url(#arr-purple)" opacity="0.8" data-from="ts-h100" data-to="h100" data-label="VPN → H100"/>
+
+<path id="c15" class="conn" d="M 398 956 Q 398 700 654 360" stroke="#3fb950" stroke-width="1.5" fill="none" marker-end="url(#arr-green)" opacity="0.4" stroke-dasharray="4,2" data-from="a100" data-to="ray-serve" data-label="join cluster :6379"/>
+
+<path id="c16" class="conn" d="M 522 346 Q 522 700 250 960" stroke="#e3b341" stroke-width="1.5" fill="none" marker-end="url(#arr-yellow)" opacity="0.7" stroke-dasharray="6,3" data-from="grpc" data-to="node-agent" data-label="gRPC :50051"/>
+<text x="360" y="660" fill="#e3b341" font-size="8" transform="rotate(-30,360,660)">gRPC :50051</text>
+
+<path id="c17" class="conn" d="M 434 344 Q 434 700 230 960" stroke="#58a6ff" stroke-width="1.2" fill="none" marker-end="url(#arr-blue)" opacity="0.5" stroke-dasharray="4,2" data-from="frp" data-to="runtime" data-label="FRP tunnel :7001"/>
+
+<path id="c18" class="conn" d="M 856 548 Q 856 750 666 956" stroke="#e3b341" stroke-width="1.2" fill="none" marker-end="url(#arr-yellow)" opacity="0.6" stroke-dasharray="4,2" data-from="hf-hub" data-to="h100" data-label="model download"/>
+<text x="800" y="740" fill="#e3b341" font-size="8">model download</text>
+
+<path id="c19" class="conn" d="M 753 674 Q 753 780 666 956" stroke="#f85149" stroke-width="1" fill="none" marker-end="url(#arr-red)" opacity="0.5" stroke-dasharray="3,4" data-from="prometheus" data-to="h100" data-label="Prometheus federation"/>
+<text x="726" y="810" fill="#f85149" font-size="8">Prometheus federation</text>
+
+<path id="c20" class="conn" d="M 1514 128 Q 1514 920 260 1020" stroke="#58a6ff" stroke-width="1" fill="none" marker-end="url(#arr-blue)" opacity="0.3" stroke-dasharray="3,4" data-from="installer" data-to="node-agent" data-label="hourly update check"/>
+<text x="1360" y="700" fill="#58a6ff" font-size="8" font-style="italic">hourly update check</text>
+
+<path id="c21" class="conn" d="M 236 208 C 700 208 1000 60 1356 74" stroke="#8b949e" stroke-width="1.2" fill="none" marker-end="url(#arr-gray)" opacity="0.6" stroke-dasharray="5,3" data-from="supplier" data-to="installer" data-label="wget install.sh"/>
+<text x="740" y="200" fill="#8b949e" font-size="8">wget install.sh (onboarding)</text>
+
+<path id="c22" class="conn" d="M 434 490 Q 1200 600 1082 1010" stroke="#e3b341" stroke-width="1" fill="none" marker-end="url(#arr-yellow)" opacity="0.3" stroke-dasharray="3,4" data-from="cloud-clients" data-to="gpu-sources" data-label="provision GPUs"/>
+
+<path id="c23" class="conn" d="M 856 548 Q 600 750 398 956" stroke="#e3b341" stroke-width="1.2" fill="none" marker-end="url(#arr-yellow)" opacity="0.5" stroke-dasharray="4,2" data-from="hf-hub" data-to="a100" data-label="model download"/>
+
+<path id="c24" class="conn" d="M 753 674 Q 400 780 140 956" stroke="#e3b341" stroke-width="1" fill="none" marker-end="url(#arr-yellow)" opacity="0.3" stroke-dasharray="3,4" data-from="node-agent" data-to="runtime" data-label="spawn container"/>
+
+<path id="c25" class="conn" d="M 753 606 Q 856 560 856 548" stroke="#f85149" stroke-width="1" fill="none" marker-end="url(#arr-red)" opacity="0.5" stroke-dasharray="3,3" data-from="prometheus" data-to="ray-metrics" data-label="scrape :8081"/>
+<path id="c26" class="conn" d="M 1110 238 C 960 238 720 330 434 358" stroke="#58a6ff" stroke-width="1.2" fill="none" marker-end="url(#arr-blue)" opacity="0.7" stroke-dasharray="5,3" data-from="wdo-hub" data-to="ray-mgr" data-label="WDO → cluster plans"/>
+<path id="c27" class="conn" d="M 1270 308 Q 1270 320 1270 324" stroke="#a371f7" stroke-width="1.2" fill="none" marker-end="url(#arr-purple)" opacity="0.7" data-from="wdo-hub" data-to="reconstitution" data-label="checkpoint workload"/>
+<path id="c28" class="conn" d="M 1270 308 C 1270 360 1270 420 1270 456" stroke="#58a6ff" stroke-width="1.1" fill="none" marker-end="url(#arr-blue)" opacity="0.7" data-from="wdo-hub" data-to="unified" data-label="test harness workload"/>
+<path id="c29" class="conn" d="M 1110 360 C 1000 340 900 320 856 320" stroke="#a371f7" stroke-width="1.2" fill="none" marker-end="url(#arr-purple)" opacity="0.65" stroke-dasharray="4,2" data-from="reconstitution" data-to="ray-serve" data-label="Ray Serve recovery actors"/>
+<path id="c30" class="conn" d="M 1270 440 C 1180 620 900 900 666 956" stroke="#a371f7" stroke-width="1.1" fill="none" marker-end="url(#arr-purple)" opacity="0.6" stroke-dasharray="5,4" data-from="reconstitution" data-to="h100" data-label="GPU replay load"/>
+<path id="c31" class="conn" d="M 1110 500 C 980 450 840 400 750 392" stroke="#58a6ff" stroke-width="1.1" fill="none" marker-end="url(#arr-blue)" opacity="0.6" stroke-dasharray="4,2" data-from="unified" data-to="autoscaler" data-label="autoscale hints"/>
+<path id="c32" class="conn" d="M 1270 566 C 1100 720 760 930 398 956" stroke="#58a6ff" stroke-width="1.1" fill="none" marker-end="url(#arr-blue)" opacity="0.55" stroke-dasharray="5,3" data-from="unified" data-to="a100" data-label="test dispatch"/>
+
+</svg>
+</div>
+
+<!-- ── Detail Panel ── -->
+<div id="panel">
+  <div id="panel-head">
+    <span id="panel-icon"></span>
+    <div style="flex:1">
+      <div id="panel-title"></div>
+      <div id="panel-sub"></div>
+    </div>
+    <button id="panel-close" title="Close (Esc)">✕</button>
+  </div>
+  <div id="panel-body">
+    <div id="panel-details"></div>
+    <div id="panel-conns"></div>
+  </div>
+</div>
+
+</div><!-- end main-layout -->
+
+<!-- Zoom controls -->
+<div id="zoom-btns">
+  <button class="zb" id="zin" title="Zoom in (+)">+</button>
+  <button class="zb" id="zfit" title="Fit to screen (0)">⊡</button>
+  <button class="zb" id="zout" title="Zoom out (−)">−</button>
+</div>
+
+<!-- Hint overlay -->
+<div id="hint">
+  <span class="kbd">click</span> inspect · <span class="kbd">scroll</span> zoom · <span class="kbd">drag</span> pan · <span class="kbd">Esc</span> clear
+</div>
+
+<!-- Status bar -->
+<div id="statusbar">
+  <span>Branch: feat/ray-integration-testing-updates</span>
+  <span>Ray 2.54.0 · vLLM · Go 1.21 · PostgreSQL 17 · Python 3.10</span>
+  <span>AWS: us-west-2 · EC2 · EBS · EIP · ECR · ALB · CloudFront · S3</span>
+  <span id="status-sel"></span>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+
+// adjacency: nodeId → [{connId, peer, label, dir}]
+const ADJ = {};
+function reg(nodeId) { if (!ADJ[nodeId]) ADJ[nodeId] = []; }
+
+document.querySelectorAll('.conn[data-from]').forEach(el => {
+  const f = el.dataset.from, t = el.dataset.to, lbl = el.dataset.label || '';
+  reg(f); reg(t);
+  ADJ[f].push({ connId: el.id, peer: t, label: lbl, dir: '→' });
+  ADJ[t].push({ connId: el.id, peer: f, label: lbl, dir: '←' });
+});
+
+// Pretty names from data-label attributes
+const LABELS = {};
+document.querySelectorAll('.node[data-id]').forEach(n => {
+  LABELS[n.dataset.id] = n.dataset.label || n.dataset.id;
+});
+
+// ─── Pan / Zoom ──────────────────────────────────────────────────────────────
+
+const wrap = document.getElementById('canvas-wrap');
+const svg  = document.getElementById('diagram');
+
+let vx = 0, vy = 0, vw = 1700, vh = 1130;
+const BASE_W = 1700, BASE_H = 1130;
+
+function applyView() {
+  svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+}
+
+// Fit to container on load
+function fitView() {
+  const cw = wrap.clientWidth, ch = wrap.clientHeight;
+  const scale = Math.min(cw / BASE_W, ch / BASE_H);
+  vw = cw / scale; vh = ch / scale;
+  vx = (BASE_W - vw) / 2; vy = (BASE_H - vh) / 2;
+  applyView();
+}
+fitView();
+window.addEventListener('resize', fitView);
+
+// Zoom
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const svgX = vx + mx * vw / wrap.clientWidth;
+  const svgY = vy + my * vh / wrap.clientHeight;
+  const factor = e.deltaY > 0 ? 1.12 : 0.89;
+  const newW = Math.max(200, Math.min(BASE_W * 3, vw * factor));
+  const newH = newW * vh / vw;
+  vx = svgX - (mx / wrap.clientWidth) * newW;
+  vy = svgY - (my / wrap.clientHeight) * newH;
+  vw = newW; vh = newH;
+  applyView();
+}, { passive: false });
+
+// Pan
+let dragging = false, dragX0, dragY0, dvx, dvy;
+wrap.addEventListener('mousedown', e => {
+  if (e.target.closest('.node')) return;
+  dragging = true; dragX0 = e.clientX; dragY0 = e.clientY;
+  dvx = vx; dvy = vy;
+  wrap.classList.add('grabbing');
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = (e.clientX - dragX0) * vw / wrap.clientWidth;
+  const dy = (e.clientY - dragY0) * vh / wrap.clientHeight;
+  vx = dvx - dx; vy = dvy - dy;
+  applyView();
+});
+window.addEventListener('mouseup', () => {
+  dragging = false;
+  wrap.classList.remove('grabbing');
+});
+
+// Zoom buttons
+document.getElementById('zin').addEventListener('click', () => {
+  const cx = vx + vw/2, cy = vy + vh/2;
+  vw *= 0.75; vh *= 0.75;
+  vx = cx - vw/2; vy = cy - vh/2;
+  applyView();
+});
+document.getElementById('zout').addEventListener('click', () => {
+  const cx = vx + vw/2, cy = vy + vh/2;
+  vw *= 1.33; vh *= 1.33;
+  vx = cx - vw/2; vy = cy - vh/2;
+  applyView();
+});
+document.getElementById('zfit').addEventListener('click', fitView);
+
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+
+const tip = document.getElementById('tooltip');
+let tipNode = null;
+
+document.querySelectorAll('.node').forEach(n => {
+  n.addEventListener('mouseenter', e => {
+    if (tipNode === n) return;
+    const t = n.dataset.tip;
+    if (!t) return;
+    tipNode = n;
+    tip.innerHTML = t.replace(/\n/g, '<br>');
+    tip.classList.add('vis');
+    moveTip(e);
+  });
+  n.addEventListener('mousemove', moveTip);
+  n.addEventListener('mouseleave', () => {
+    tipNode = null;
+    tip.classList.remove('vis');
+  });
+});
+
+function moveTip(e) {
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if (x + 300 > window.innerWidth) x = e.clientX - 320;
+  if (y + 200 > window.innerHeight) y = e.clientY - 120;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+}
+
+// ─── Selection & Panel ────────────────────────────────────────────────────────
+
+const diagramEl = document.getElementById('diagram');
+const panel     = document.getElementById('panel');
+const panelIcon  = document.getElementById('panel-icon');
+const panelTitle = document.getElementById('panel-title');
+const panelSub   = document.getElementById('panel-sub');
+const panelDets  = document.getElementById('panel-details');
+const panelConns = document.getElementById('panel-conns');
+const statusSel  = document.getElementById('status-sel');
+
+let selected = null;
+
+function selectNode(nodeEl) {
+  clearSelection();
+  selected = nodeEl;
+  const id = nodeEl.dataset.id;
+
+  // Visual state
+  diagramEl.classList.add('svg-dim');
+  nodeEl.classList.add('sel');
+
+  // Highlight adjacent
+  const adj = ADJ[id] || [];
+  const peerIds = new Set(adj.map(a => a.peer));
+  peerIds.forEach(pid => {
+    const el = document.getElementById('node-' + pid);
+    if (el) el.classList.add('adj');
+  });
+  // Highlight connections
+  adj.forEach(a => {
+    const cel = document.getElementById(a.connId);
+    if (cel) cel.classList.add('conn-lit');
+  });
+
+  // Status
+  statusSel.textContent = '● ' + (nodeEl.dataset.label || id);
+
+  // Panel
+  buildPanel(nodeEl, id, adj);
+  panel.classList.add('open');
+  document.getElementById('hint').style.display = 'none';
+}
+
+function clearSelection() {
+  if (selected) selected.classList.remove('sel');
+  diagramEl.classList.remove('svg-dim');
+  document.querySelectorAll('.adj').forEach(e => e.classList.remove('adj'));
+  document.querySelectorAll('.conn-lit').forEach(e => e.classList.remove('conn-lit'));
+  selected = null;
+  panel.classList.remove('open');
+  statusSel.textContent = '';
+  document.getElementById('hint').style.display = '';
+}
+
+function buildPanel(nodeEl, id, adj) {
+  // Title / icon
+  const raw = nodeEl.dataset.tip || '';
+  const lines = raw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').split('\n');
+  const titleLine = lines[0] || id;
+  // Extract emoji from title
+  const emojiMatch = titleLine.match(/^([\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}🐹☀️📊🚀📈🏥📡🤗🔥📈🔥📦⚡🔀🌐☁️🗂️⚖️🗄️🖥️🔐🛡️🌿])/u);
+  panelIcon.textContent = emojiMatch ? emojiMatch[1] : '⬡';
+  panelTitle.textContent = titleLine.replace(/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}🐹☀️📊🚀📈🏥📡🤗🔥📦⚡🔀🌐☁️🗂️⚖️🗄️🖥️🔐🛡️🌿\s]*/u, '').trim();
+  panelSub.textContent = nodeEl.dataset.label || '';
+
+  // Detail lines
+  const bodyLines = lines.slice(2).filter(l => l.trim());
+  let html = '';
+  if (bodyLines.length) {
+    html += '<div class="p-sec"><div class="p-sec-title">Details</div>';
+    bodyLines.forEach(l => {
+      const trimmed = l.trim();
+      if (!trimmed) return;
+      // Detect port patterns
+      const formatted = trimmed
+        .replace(/:(\d{4,5})\b/g, '<span class="p-port">:$1</span>')
+        .replace(/\b(POST|GET|DELETE|PUT)\b/g, '<code>$1</code>');
+      const bullet = trimmed.startsWith('•') || trimmed.startsWith('-') ? '' : '·&nbsp;';
+      html += `<div class="p-line">${bullet}${formatted}</div>`;
+    });
+    html += '</div>';
+  }
+  panelDets.innerHTML = html;
+
+  // Connections
+  if (adj.length) {
+    let ch = '<div class="p-sec"><div class="p-sec-title">Connections (' + adj.length + ')</div>';
+    adj.forEach(a => {
+      const peerLabel = LABELS[a.peer] || a.peer;
+      ch += `<div class="conn-item" data-peer="${a.peer}">
+        <span class="conn-dir">${a.dir}</span>
+        <span class="conn-name">${peerLabel}</span>
+        <span class="conn-lbl">${a.label}</span>
+      </div>`;
+    });
+    ch += '</div>';
+    panelConns.innerHTML = ch;
+
+    // Click on conn-item → jump to that node
+    panelConns.querySelectorAll('.conn-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const el = document.getElementById('node-' + item.dataset.peer);
+        if (el) { selectNode(el); scrollToNode(el); }
+      });
+    });
+  } else {
+    panelConns.innerHTML = '';
+  }
+}
+
+function scrollToNode(nodeEl) {
+  const rect = nodeEl.querySelector('rect');
+  if (!rect) return;
+  const x = parseFloat(rect.getAttribute('x')) + parseFloat(rect.getAttribute('width'))/2;
+  const y = parseFloat(rect.getAttribute('y')) + parseFloat(rect.getAttribute('height'))/2;
+  const cw = wrap.clientWidth, ch = wrap.clientHeight;
+  vx = x - (cw / 2) * vw / cw;
+  vy = y - (ch / 2) * vh / ch;
+  applyView();
+}
+
+// Node click
+document.querySelectorAll('.node').forEach(n => {
+  n.addEventListener('click', e => {
+    e.stopPropagation();
+    tip.classList.remove('vis');
+    if (selected === n) { clearSelection(); return; }
+    selectNode(n);
+  });
+});
+
+// Click canvas → deselect
+wrap.addEventListener('click', e => {
+  if (!e.target.closest('.node')) clearSelection();
+});
+
+// Panel close
+document.getElementById('panel-close').addEventListener('click', clearSelection);
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+const searchInput = document.getElementById('search-input');
+const searchCount = document.getElementById('search-count');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) {
+    diagramEl.classList.remove('svg-search');
+    document.querySelectorAll('.smatch').forEach(e => e.classList.remove('smatch'));
+    searchCount.textContent = '';
+    return;
+  }
+  let count = 0;
+  document.querySelectorAll('.node').forEach(n => {
+    const text = ((n.dataset.label || '') + ' ' + (n.dataset.tip || '')).toLowerCase();
+    if (text.includes(q)) {
+      n.classList.add('smatch'); count++;
+    } else {
+      n.classList.remove('smatch');
+    }
+  });
+  diagramEl.classList.add('svg-search');
+  searchCount.textContent = count ? `${count} found` : 'no match';
+});
+
+// ─── Workload definition cycle + GPU meters ───────────────────────────────────
+
+const wdoChips = Array.from(document.querySelectorAll('.wdo-chip'));
+const scenarioNodes = {
+  reconstitution: document.getElementById('node-reconstitution'),
+  unified: document.getElementById('node-unified')
+};
+const gpuMeters = Array.from(document.querySelectorAll('.gpu-meter-fill')).map(fill => ({
+  id: fill.dataset.gpu,
+  fill,
+  maxWidth: parseFloat(fill.dataset.width || '0'),
+  label: document.querySelector(`.gpu-meter-label[data-gpu-label="${fill.dataset.gpu}"]`)
+}));
+
+const WDO_SCENARIOS = [
+  { id: 'reconstitution', label: 'Reconstitution', util: { a100: 64, h100: 91 } },
+  { id: 'unified', label: 'Unified Tests', util: { a100: 83, h100: 74 } }
+];
+
+function applyScenario(scenario) {
+  if (!scenario) return;
+  wdoChips.forEach(ch => ch.classList.toggle('active', ch.dataset.wdo === scenario.id));
+  Object.entries(scenarioNodes).forEach(([id, node]) => {
+    if (!node) return;
+    if (id === scenario.id) node.classList.add('glow');
+    else node.classList.remove('glow');
+  });
+  updateGpuMeters(scenario.util, scenario.label);
+}
+
+function updateGpuMeters(utilMap, suffix) {
+  gpuMeters.forEach(m => {
+    if (!m.fill) return;
+    const target = utilMap?.[m.id] ?? 55;
+    const jitter = Math.max(0, Math.min(100, Math.round(target + (Math.random() * 6 - 3))));
+    const width = (m.maxWidth || 0) * jitter / 100;
+    m.fill.setAttribute('width', width);
+    if (m.label) {
+      m.label.textContent = `${suffix} · ${jitter}%`;
+    }
+  });
+}
+
+let scenarioPointer = 0;
+function advanceScenario() {
+  applyScenario(WDO_SCENARIOS[scenarioPointer]);
+  scenarioPointer = (scenarioPointer + 1) % WDO_SCENARIOS.length;
+}
+
+function forceScenario(id) {
+  const idx = WDO_SCENARIOS.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  applyScenario(WDO_SCENARIOS[idx]);
+  scenarioPointer = (idx + 1) % WDO_SCENARIOS.length;
+}
+
+wdoChips.forEach(chip => {
+  chip.addEventListener('click', () => {
+    forceScenario(chip.dataset.wdo);
+  });
+});
+
+advanceScenario();
+setInterval(advanceScenario, 3800);
+
+// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (searchInput.value) {
+      searchInput.value = '';
+      searchInput.dispatchEvent(new Event('input'));
+      searchInput.blur();
+    } else {
+      clearSelection();
+    }
+  }
+  if (e.key === '/' && document.activeElement !== searchInput) {
+    e.preventDefault();
+    searchInput.focus();
+    searchInput.select();
+  }
+  if ((e.key === '+' || e.key === '=') && !e.target.matches('input')) {
+    document.getElementById('zin').click();
+  }
+  if (e.key === '-' && !e.target.matches('input')) {
+    document.getElementById('zout').click();
+  }
+  if (e.key === '0' && !e.target.matches('input')) {
+    fitView();
+  }
+});
+
+// ─── Animate connections on load ──────────────────────────────────────────────
+document.querySelectorAll('.conn').forEach((el, i) => {
+  const orig = el.style.opacity || el.getAttribute('opacity') || '1';
+  el.style.opacity = '0';
+  el.style.transition = `opacity 0.4s ease ${i * 30}ms`;
+  setTimeout(() => { el.style.opacity = orig; }, 80);
+});
+</script>
+</body>
+</html>
